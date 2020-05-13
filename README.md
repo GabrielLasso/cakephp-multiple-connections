@@ -1,51 +1,60 @@
-# CakePHP Application Skeleton
+## Multiple db connections in a cake php project
 
-[![Build Status](https://img.shields.io/travis/cakephp/app/master.svg?style=flat-square)](https://travis-ci.org/cakephp/app)
-[![Total Downloads](https://img.shields.io/packagist/dt/cakephp/app.svg?style=flat-square)](https://packagist.org/packages/cakephp/app)
+### Setting up the databases
+First, run `docker-compose up` to run the containers.
 
-A skeleton for creating applications with [CakePHP](https://cakephp.org) 3.x.
+Then access the container of the first database by running `docker exec -it cakephp-multiple-connections_db1_1 bash`.
 
-The framework source code can be found here: [cakephp/cakephp](https://github.com/cakephp/cakephp).
+There, enter in mysql by `mysql -pexample` and then:
 
-## Installation
-
-1. Download [Composer](https://getcomposer.org/doc/00-intro.md) or update `composer self-update`.
-2. Run `php composer.phar create-project --prefer-dist cakephp/app [app_name]`.
-
-If Composer is installed globally, run
-
-```bash
-composer create-project --prefer-dist cakephp/app
+```
+CREATE DATABASE example;
+USE example;
+CRETATE TABLE test (id INT NOT NULL, number INT NOT NULL, PRIMARY KEY (id));
+INSERT INTO table (id, number) VALUES (0,0),(1,2),(2,4),(3,6);
 ```
 
-In case you want to use a custom app dir name (e.g. `/myapp/`):
-
-```bash
-composer create-project --prefer-dist cakephp/app myapp
+To setup the second database do the same thing but in `db2` container and with different data:
+- `docker exec -it cakephp-multiple-connections_db2_1 bash`
+- `mysql -pexample`
+- ```
+CREATE DATABASE example;
+USE example;
+CRETATE TABLE test (id INT NOT NULL, number INT NOT NULL, PRIMARY KEY (id));
+INSERT INTO table (id, number) VALUES (0,1),(1,3),(2,5),(3,7);
 ```
 
-You can now either use your machine's webserver to view the default home page, or start
-up the built-in webserver with:
+### Testing
+Just access `localhost` and you will see that it gets the first element of db1 (id:0, number:0) and the first element of db2 (id:0, number:1).
 
-```bash
-bin/cake server -p 8765
+### How it works
+In `config/app.php`, there are 2 entries for Datasources, the default configured for `db1` and a new one called db2 configured for `db2`.
+
+Then, in the PagesController, there is a connection with "default" and a connection with "db2". To run a query in db2, you need to set the Table's connection to the "db2" connection, by doing
+```
+    $this->TableName->connection($connectionName);
+```
+of, if you are inside the Table class, just:
+```
+    $this->TableName->connection($connection);
 ```
 
-Then visit `http://localhost:8765` to see the welcome page.
+In the example, we do the following:
+```
+    $this->LoadModel("Test");
+    $conn1 = ConnectionManager::get('default');
+    $conn2 = ConnectionManager::get('db2');
 
-## Update
+    $this->Test->connection($conn1);
+    $test1 = $this->Test->get(0);
+    $this->Test->connection($conn2);
+    $test2 = $this->Test->get(0);
 
-Since this skeleton is a starting point for your application and various files
-would have been modified as per your needs, there isn't a way to provide
-automated upgrades, so you have to do any updates manually.
+    $result = [
+        "db1" => $test1,
+        "db2" => $test2
+    ];
+```
 
-## Configuration
-
-Read and edit `config/app.php` and setup the `'Datasources'` and any other
-configuration relevant for your application.
-
-## Layout
-
-The app skeleton uses a subset of [Foundation](http://foundation.zurb.com/) (v5) CSS
-framework by default. You can, however, replace it with any other library or
-custom styles.
+### Good pratices
+I recommend to, every time you change a connection of a table, you reset it to the default connection, so every time you want to make a query you know where it will be made
