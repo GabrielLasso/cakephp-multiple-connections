@@ -1,0 +1,27 @@
+version: '3'
+services:
+  app:
+    image: deliverydireto/php73-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - .:/var/www/html/public
+      - ./docker/local-conf:/etc/nginx/sites-available:ro
+  db1:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=example
+    volumes:
+      - ./data/db1:/var/lib/sql
+  db2:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=example
+    volumes:
+      - ./data/db2:/var/lib/sql
+
